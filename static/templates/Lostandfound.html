@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USIU Lost And Found</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='usiulostnfound.css') }}">
+</head>
+
+<body>
+
+    <h1>USIU Lost And Found</h1>
+    <p>
+        Welcome to the USIU Lost and Found page. If you have lost an item or found something that belongs to someone else, please follow the instructions below to report it. Our team will assist you in locating your lost items or returning found items to their rightful owners.
+    </p>
+
+    <div class="form-container">
+    <h2>Report Found Item</h2>
+    
+    <form action="/report" method="POST" enctype="multipart/form-data" id="reportForm">
+        
+        <div class="form-group">
+            <label for="description">General Item Description</label>
+            <input type="text" id="description" name="description" placeholder="e.g., Black HP Laptop, Blue Water Bottle" required>
+        </div>
+
+        <div class="form-group">
+            <label for="unique_identifier">One Unique Identifier</label>
+            <textarea id="unique_identifier" name="unique_identifier" placeholder="e.g., Has a cracked screen top left, USIU sticker on the back" required></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="last_spotted_location">Where was it last spotted/picked from?</label>
+            <input type="text" id="last_spotted_location" name="last_spotted_location" placeholder="e.g., Library 2nd floor, Science Complex room 14" required>
+        </div>
+
+        <div class="form-group">
+            <label for="date_found">Day it was picked</label>
+            <input type="date" id="date_found" name="date_found" required>
+        </div>
+
+        <div class="form-group">
+            <label for="item_image">Submit a Picture of the Item</label>
+            <input type="file" id="item_image" name="item_image" accept="image/*" required>
+        </div>
+
+        <button type="submit">Submit Report to Security</button>
+    </form>
+</div>
+
+<script src="{{ url_for('static', filename='usiulostnfound.js') }}"></script>
+</body>
+</html>
