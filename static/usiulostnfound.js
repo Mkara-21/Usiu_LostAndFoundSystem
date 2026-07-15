@@ -10,6 +10,16 @@ function showSection(sectionId) {
     document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
 }
 
+// Opens the ownership claim form pre-filled with the chosen item's details,
+// and records the item's database id so the claim links back to the real item.
+function startClaim(button) {
+    const itemId = button.getAttribute('data-item-id') || '';
+    const itemDesc = button.getAttribute('data-item-desc') || '';
+    document.getElementById('claim-item-id').value = itemId;
+    document.getElementById('claim-item-name').value = itemDesc;
+    showSection('owner-section');
+}
+
 function filterCategory(categoryName) {
     // Grab all the item rows in the table
     const rows = document.querySelectorAll('.item-row');

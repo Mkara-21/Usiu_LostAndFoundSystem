@@ -55,7 +55,8 @@
                 </div>
                 <div class="form-group">
                     <label>Official Email</label>
-                    <input type="email" name="email" class="form-control" placeholder="username@usiu.ac.ke" required>
+                    <input type="email" name="email" class="form-control" placeholder="username@usiu.ac.ke"
+                           pattern="[^@\s]+@usiu\.ac\.ke" title="Must be a valid @usiu.ac.ke email address" required>
                 </div>
                 <div class="form-group">
                     <label>Identification Number</label>
@@ -89,11 +90,8 @@
 
         {% if role == "student" %}
         <div class="operations-header">
-            <h2 style="margin: 0; font-size: 28px; color: var(--usiu-blue);">Student Operations Desk</h2>
-            <p style="color: #666; font-size: 14px; margin: 5px 0 25px 0; font-style: italic; letter-spacing: 0.5px;">
-                Powered by <strong style="color: var(--usiu-gold);">Natalie Verification Systems & Co.</strong>
-            </p>
-            
+            <h2 style="margin: 0 0 25px 0; font-size: 28px; color: var(--usiu-blue);">Student Operations Desk</h2>
+
             <div class="hero-btn-container">
                 <button class="pill-btn-large" onclick="showSection('finder-section')">🤝 I Found an Item</button>
                 <button class="pill-btn-large gold-variant" onclick="showSection('owner-section')">🔍 I Lost Something</button>
@@ -151,9 +149,10 @@
         <div id="owner-section" class="card" style="display: none; border-top: 4px solid var(--usiu-gold);">
             <h3>Submit Ownership Claim Verification Request</h3>
             <form action="/submit-claim" method="POST">
+                <input type="hidden" name="item_id" id="claim-item-id">
                 <div class="form-group">
                     <label>Which item are you claiming?</label>
-                    <input type="text" name="claimed_item" class="form-control" placeholder="Enter description or match item name from live list" required>
+                    <input type="text" name="claimed_item" id="claim-item-name" class="form-control" placeholder="Enter description or match item name from live list" required>
                 </div>
                 <div class="form-group">
                     <label>Provide Proof of Ownership (Describe the Secret Identifier)</label>
@@ -199,7 +198,7 @@
                         </td>
                         <td>📍 {{ item.location }}</td>
                         <td>📅 {{ item.date }}</td>
-                        <td><button class="pill-btn" onclick="showSection('owner-section')">Claim Item</button></td>
+                        <td><button class="pill-btn" data-item-id="{{ item.id }}" data-item-desc="{{ item.description }}" onclick="startClaim(this)">Claim Item</button></td>
                     </tr>
                     {% else %}
                     <tr>
@@ -259,7 +258,20 @@
                                     <p><strong>📅 Date Recovered:</strong> {{ item.date }}</p>
                                     <p><strong>🔑 Secret Identifier:</strong> <span style="background: #e0f2f1; color: #004d40; padding: 2px 6px; border-radius: 4px; font-weight: bold;">{{ item.identifier }}</span></p>
                                     <p><strong>📞 Finder Contact Record:</strong> {{ item.contact }}</p>
-                                    <p><strong>⚙️ Status:</strong> <span class="status-badge status-confirmed">🟢 Secured in Vault</span></p>
+                                    <p><strong>⚙️ Status:</strong>
+                                        {% if item.status == 'Pending Security' %}
+                                        <span class="status-badge">🟡 Pending Security</span>
+                                        {% elif item.status == 'Checked-In' %}
+                                        <span class="status-badge status-confirmed">🟢 Secured in Vault</span>
+                                        {% else %}
+                                        <span class="status-badge">✅ Claimed</span>
+                                        {% endif %}
+                                    </p>
+                                    {% if item.status == 'Pending Security' %}
+                                    <form action="/items/{{ item.id }}/checkin" method="POST" style="margin-top: 10px;">
+                                        <button type="submit" class="pill-btn">✅ Confirm Check-In to Vault</button>
+                                    </form>
+                                    {% endif %}
                                 </div>
                             </div>
                         </td>
@@ -291,11 +303,22 @@
                         <td class="review-card">📄 {{ claim.proof_identifier }}</td>
                         <td>📱 {{ claim.contact }}</td>
                         <td>
-                            <select class="status-select" onchange="alert('Claim status updated!')">
-                                <option value="pending">⏳ Pending Review</option>
-                                <option value="approved">✅ Approve Release</option>
-                                <option value="denied">❌ Deny & Reject</option>
-                            </select>
+                            {% if claim.status == 'Pending' %}
+                            <div style="display: flex; gap: 8px;">
+                                <form action="/claims/{{ claim.id }}/decision" method="POST">
+                                    <input type="hidden" name="decision" value="approve">
+                                    <button type="submit" class="pill-btn">✅ Approve</button>
+                                </form>
+                                <form action="/claims/{{ claim.id }}/decision" method="POST">
+                                    <input type="hidden" name="decision" value="deny">
+                                    <button type="submit" class="pill-btn" style="background: #b00020;">❌ Deny</button>
+                                </form>
+                            </div>
+                            {% elif claim.status == 'Approved' %}
+                            <span class="status-badge status-confirmed">✅ Approved & Released</span>
+                            {% else %}
+                            <span class="status-badge" style="background: #b00020; color: #fff;">❌ Denied</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% else %}
