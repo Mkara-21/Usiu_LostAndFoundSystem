@@ -190,7 +190,13 @@
                     {% for item in found_items %}
                     <tr class="item-row" data-category="{{ item.category }}">
                         <td><span class="admin-badge">{{ item.category }}</span></td>
-                        <td><strong>{{ item.description }}</strong></td>
+                        <td>
+                            {% if item.image_path %}
+                            <img src="{{ url_for('static', filename=item.image_path) }}" alt="Item photo"
+                                 style="width: 48px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; vertical-align: middle; margin-right: 10px;">
+                            {% endif %}
+                            <strong>{{ item.description }}</strong>
+                        </td>
                         <td>📍 {{ item.location }}</td>
                         <td>📅 {{ item.date }}</td>
                         <td><button class="pill-btn" onclick="showSection('owner-section')">Claim Item</button></td>
@@ -238,9 +244,16 @@
                     <tr id="details-{{ loop.index }}" style="display: none; background: #fafafa;">
                         <td colspan="4" style="padding: 20px; border-left: 4px solid var(--usiu-blue);">
                             <div style="display: flex; gap: 20px;">
+                                {% if item.image_path %}
+                                <a href="{{ url_for('static', filename=item.image_path) }}" target="_blank">
+                                    <img src="{{ url_for('static', filename=item.image_path) }}" alt="Item photo"
+                                         style="width: 150px; height: 150px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc;">
+                                </a>
+                                {% else %}
                                 <div style="width: 150px; height: 150px; background: #eee; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px solid #ccc; font-size: 12px; color: #777;">
-                                    📷 Item Photo
+                                    📷 No Photo
                                 </div>
+                                {% endif %}
                                 <div>
                                     <p><strong>📍 Location Logged:</strong> {{ item.location }}</p>
                                     <p><strong>📅 Date Recovered:</strong> {{ item.date }}</p>

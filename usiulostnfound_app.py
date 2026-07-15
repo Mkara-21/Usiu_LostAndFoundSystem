@@ -2,10 +2,12 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.utils import secure_filename
 
+from usiulostnfound_database import init_db, get_connection
+
 current_directory = os.path.dirname(os.path.abspath(__file__))
 
-app = Flask(__name__, 
-            template_folder=os.path.join(current_directory, 'static', 'templates'), 
+app = Flask(__name__,
+            template_folder=os.path.join(current_directory, 'static', 'templates'),
             static_folder=os.path.join(current_directory, 'static'))
 
 app.secret_key = 'usiu_lost_n_found_secure_key_2026'
@@ -17,20 +19,29 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# Temporary in-memory databases
-lost_and_found_database = []
-claims_database = []
+# Make sure the database file and tables exist before serving any request
+init_db()
+
+@app.route('/')
+def home():
+    # Base URL just redirects to the main dashboard
+    return redirect(url_for('report_form'))
 
 @app.route('/report', methods=['GET'])
 def report_form():
     # Grabs whoever is logged in. If no one is logged in, it will show the login/signup screen!
-    current_role = session.get('role', None) 
+    current_role = session.get('role', None)
     current_user_name = session.get('user_name', 'Guest')
-    
+
+    conn = get_connection()
+    found_items = conn.execute("SELECT * FROM items ORDER BY id DESC").fetchall()
+    claims = conn.execute("SELECT * FROM claims ORDER BY id DESC").fetchall()
+    conn.close()
+
     return render_template(
-        'Lostandfound.html', 
-        found_items=lost_and_found_database, 
-        claims=claims_database,
+        'Lostandfound.html',
+        found_items=found_items,
+        claims=claims,
         role=current_role,
         user_name=current_user_name
     )
@@ -43,25 +54,25 @@ def handle_item_submission():
     location = request.form.get('location')
     date_picked = request.form.get('date')
     contact = request.form.get('finder_contact')
-    
+
     file = request.files.get('item_photo')
     filename = None
     if file and file.filename != '':
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-    new_report = {
-        "category": item_category,
-        "description": item_description,
-        "identifier": unique_identifier,
-        "location": location,
-        "date": date_picked,
-        "contact": contact,
-        "image_path": f"uploads/{filename}" if filename else None
-    }
+    image_path = f"uploads/{filename}" if filename else None
 
-    lost_and_found_database.append(new_report)
-    print(f"\n🤝 FOUND ITEM LOGGED: {new_report}\n")
+    conn = get_connection()
+    conn.execute(
+        """INSERT INTO items (category, description, identifier, location, date, contact, image_path)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (item_category, item_description, unique_identifier, location, date_picked, contact, image_path),
+    )
+    conn.commit()
+    conn.close()
+
+    print(f"\n🤝 FOUND ITEM LOGGED: {item_description} ({item_category})\n")
     return redirect(url_for('report_form'))
 
 @app.route('/submit-claim', methods=['POST'])
@@ -70,15 +81,16 @@ def handle_claim_submission():
     proof_identifier = request.form.get('proof_identifier')
     contact = request.form.get('owner_contact')
 
-    new_claim = {
-        "claimed_item": claimed_item,
-        "proof_identifier": proof_identifier,
-        "contact": contact,
-        "status": "Pending Verification"
-    }
+    conn = get_connection()
+    conn.execute(
+        """INSERT INTO claims (claimed_item, proof_identifier, contact, status)
+           VALUES (?, ?, ?, ?)""",
+        (claimed_item, proof_identifier, contact, "Pending Verification"),
+    )
+    conn.commit()
+    conn.close()
 
-    claims_database.append(new_claim)
-    print(f"\n🔍 NEW OWNER CLAIM SUBMITTED: {new_claim}\n")
+    print(f"\n🔍 NEW OWNER CLAIM SUBMITTED: {claimed_item}\n")
     return redirect(url_for('report_form'))
 
 @app.route('/logout')
@@ -86,17 +98,6 @@ def handle_logout():
     session.clear()  # This completely wipes out the active role!
     session['role'] = None  # Explicitly forces role to be hidden
     return redirect(url_for('report_form'))
-
-# Temporary registered users database simulator
-# Pre-populating one master security account for testing
-registered_users = {
-    "123456789": {
-        "name": "Admin Officer",
-        "email": "security@usiu.ac.ke",
-        "password": "password123",
-        "role": "security"
-    }
-}
 
 # REWRITTEN ROUTE: Process Account Registration with Strict Digit Length Validation
 @app.route('/signup', methods=['POST'])
@@ -111,22 +112,26 @@ def handle_signup():
     if selected_role == 'student' and len(user_id) != 6:
         # Returns a basic browser warning if rules are broken
         return "❌ Registration Failed: Student IDs must be exactly 6 digits.", 400
-        
+
     if selected_role == 'security' and len(user_id) != 9:
         return "❌ Registration Failed: Security Officer Badge IDs must be exactly 9 digits.", 400
 
+    conn = get_connection()
+
     # Check if user already exists
-    if user_id in registered_users:
+    existing = conn.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    if existing:
+        conn.close()
         return "❌ User already exists! Go back and log in.", 400
 
-    # Save user into memory record storage
-    registered_users[user_id] = {
-        "name": full_name,
-        "email": email,
-        "password": password,
-        "role": selected_role
-    }
-    
+    # Save user into the database
+    conn.execute(
+        "INSERT INTO users (user_id, name, email, password, role) VALUES (?, ?, ?, ?, ?)",
+        (user_id, full_name, email, password, selected_role),
+    )
+    conn.commit()
+    conn.close()
+
     print(f"\n🔐 DATABASE COMMITTED: New account registered for {full_name} ({user_id})")
 
     # Log them in dynamically
@@ -144,10 +149,12 @@ def handle_login():
     user_id = request.form.get('user_id').strip()
     password = request.form.get('password')
 
+    conn = get_connection()
+    account = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+
     # Verify if user exists in our records
-    if user_id in registered_users:
-        account = registered_users[user_id]
-        
+    if account:
         # Verify both password and chosen dashboard role match
         if account['password'] == password and account['role'] == selected_role:
             session['role'] = selected_role
