@@ -14,9 +14,27 @@ app = Flask(__name__,
             template_folder=os.path.join(current_directory, 'static', 'templates'),
             static_folder=os.path.join(current_directory, 'static'))
 
-# Secret key comes from the environment in real deployments; the fallback keeps
-# local development working out of the box.
-app.secret_key = os.environ.get('SECRET_KEY', 'usiu_lost_n_found_secure_key_2026')
+# Secret key must come from the environment in production.
+# In local development, we allow a fallback but warn the user.
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    is_development = (
+        os.environ.get('FLASK_ENV') == 'development' or 
+        os.environ.get('FLASK_DEBUG') in ('1', 'true') or 
+        __name__ == '__main__'
+    )
+    if is_development:
+        secret_key = 'dev_fallback_secret_key_change_me_in_production'
+    else:
+        raise RuntimeError("FATAL: SECRET_KEY environment variable must be set in production mode!")
+app.secret_key = secret_key
+
+# Harden session cookie security settings
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=not is_development  # Require HTTPS in production
+)
 
 # Configure a folder to save uploaded item images
 UPLOAD_FOLDER = os.path.join(current_directory, 'static', 'uploads')
